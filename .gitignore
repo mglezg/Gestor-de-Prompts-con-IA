@@ -22,3 +22,7 @@ rad.json
 TestResults.xml
 #entorno local
 .venv
+#Carpeta local de prompts
+data/
+# Cache de python local
+__pycache__/
