@@ -4,3 +4,6 @@
 data/
 # Cache de python local
 __pycache__/
+
+# versión de python
+python-*-amd64.exe
