@@ -13,11 +13,21 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
+# ── Almacen de API keys en memoria del proceso ────────────
+# Se usa un dict en el modulo para que persista entre requests
+# dentro del mismo proceso worker (no se pierde como os.environ
+# entre procesos padre/hijo de uvicorn --reload)
+_api_keys: dict = {
+    "anthropic": os.environ.get("ANTHROPIC_API_KEY", ""),
+    "openai":    os.environ.get("OPENAI_API_KEY", ""),
+    "deepseek":  os.environ.get("DEEPSEEK_API_KEY", ""),
+}
+
 
 class AnalyzeRequest(BaseModel):
+    model_config = {"protected_namespaces": ()}
     prompt_id: Optional[int] = None
     content:   Optional[str] = None
-    # El frontend puede mandar proveedor y modelo explicitamente
     provider:  Optional[str] = None
     model:     Optional[str] = None
 
@@ -29,34 +39,32 @@ class QuickAnalyzeRequest(BaseModel):
 
 
 class ApiKeyConfig(BaseModel):
-    provider: str   # "anthropic" | "openai" | "deepseek"
+    provider: str
     api_key:  str
 
 
-# ── Helpers para leer las keys del entorno ───────────────
-ENV_KEYS = {
-    "anthropic": "ANTHROPIC_API_KEY",
-    "openai":    "OPENAI_API_KEY",
-    "deepseek":  "DEEPSEEK_API_KEY",
-}
+def _resolve_provider_and_key(requested_provider: Optional[str]):
+    """
+    Devuelve (provider, key) segun el proveedor solicitado.
+    Si es None o 'auto', usa el primer proveedor con key configurada.
+    """
+    if requested_provider and requested_provider != "auto":
+        key = _api_keys.get(requested_provider, "")
+        return (requested_provider, key)
 
-def _get_active_key(provider: Optional[str] = None):
-    """Devuelve (provider, key) activos. Si no se pasa provider, prueba los tres."""
-    if provider:
-        key = os.environ.get(ENV_KEYS.get(provider, ""), "")
-        return (provider, key) if key else (provider, "")
-
-    for prov, env_var in ENV_KEYS.items():
-        key = os.environ.get(env_var, "")
+    # Modo auto: primer proveedor con key
+    for prov in ("anthropic", "openai", "deepseek"):
+        key = _api_keys.get(prov, "")
         if key:
             return (prov, key)
+
     return (None, "")
 
 
 # ── Endpoints ────────────────────────────────────────────
 @router.post("/analyze", response_model=AnalysisOut)
 async def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
-    provider, api_key = _get_active_key(req.provider)
+    provider, api_key = _resolve_provider_and_key(req.provider)
 
     if req.prompt_id:
         prompt = db.query(Prompt).filter(Prompt.id == req.prompt_id).first()
@@ -72,7 +80,7 @@ async def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
 
     result = await analyze_prompt(
         content,
-        api_key=api_key,
+        api_key=api_key or "",
         provider=provider,
         model=req.model
     )
@@ -101,9 +109,8 @@ async def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
 
 @router.post("/quick")
 async def quick_analyze(req: QuickAnalyzeRequest):
-    """Analisis rapido sin guardar en BD."""
-    provider, api_key = _get_active_key(req.provider)
-    result = await analyze_prompt(req.content, api_key=api_key, provider=provider, model=req.model)
+    provider, api_key = _resolve_provider_and_key(req.provider)
+    result = await analyze_prompt(req.content, api_key=api_key or "", provider=provider, model=req.model)
     return result
 
 
@@ -124,33 +131,30 @@ def get_model_targets():
     return MODEL_TARGETS
 
 
-# ── Configuracion de API keys ─────────────────────────────
 @router.post("/config/api-key")
 async def set_api_key(data: ApiKeyConfig):
-    """Guarda o elimina una API key en variables de entorno de sesion."""
+    """Guarda la API key en el diccionario en memoria del proceso."""
     provider = data.provider.lower()
-    if provider not in ENV_KEYS:
+    if provider not in _api_keys:
         raise HTTPException(status_code=400, detail=f"Proveedor desconocido: {provider}")
 
-    env_var = ENV_KEYS[provider]
+    _api_keys[provider] = data.api_key.strip()
     if data.api_key.strip():
-        os.environ[env_var] = data.api_key.strip()
         return {"ok": True, "message": f"API key de {provider} configurada"}
     else:
-        os.environ.pop(env_var, None)
         return {"ok": True, "message": f"API key de {provider} eliminada"}
 
 
 @router.get("/config/providers")
 async def get_providers_status():
-    """Devuelve el estado de los tres proveedores y sus modelos disponibles."""
-    providers = {}
-    for prov, env_var in ENV_KEYS.items():
-        key = os.environ.get(env_var, "")
-        providers[prov] = {
+    """Estado de los tres proveedores y sus modelos disponibles."""
+    result = {}
+    for prov in ("anthropic", "openai", "deepseek"):
+        key = _api_keys.get(prov, "")
+        result[prov] = {
             "configured": bool(key),
             "preview": f"{key[:12]}..." if len(key) > 12 else "",
             "models": PROVIDER_MODELS.get(prov, []),
             "default_model": DEFAULT_MODELS.get(prov, ""),
         }
-    return providers
+    return result
