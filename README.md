@@ -86,7 +86,7 @@ Prompt Manager es una aplicación web local que te permite organizar, versionar 
 Descarga o clona el repositorio en tu máquina:
 
 ```bash
-git clone https://github.com/tu-usuario/prompt-manager.git
+git clone https://github.com/mglezg/Gestor-de-Prompts-con-IA.git
 cd prompt-manager
 ```
 

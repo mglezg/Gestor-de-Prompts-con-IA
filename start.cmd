@@ -1,48 +1,55 @@
 @echo off
-chcp 65001 >nul
 title Prompt Manager
 
 echo.
-echo  ╔══════════════════════════════════════════╗
-echo  ║       🚀 PROMPT MANAGER - LAUNCHER       ║
-echo  ╚══════════════════════════════════════════╝
+echo  ==========================================
+echo   PROMPT MANAGER - LAUNCHER
+echo  ==========================================
 echo.
 
 :: Verificar que existe el entorno virtual
 if not exist ".venv\Scripts\activate.bat" (
-    echo  ❌ No se encontró el entorno virtual .venv
-    echo  👉 Ejecuta primero: setup.cmd
+    echo  ERROR: No se encontro el entorno virtual .venv
+    echo  Ejecuta primero: setup.cmd
     echo.
     pause
     exit /b 1
 )
 
 :: Activar entorno virtual
-echo  ✔ Activando entorno virtual...
-call .venv\Scripts\activate.bat
+echo  [OK] Activando entorno virtual...
+call ".venv\Scripts\activate.bat"
 
-:: Verificar que existe run.py
-if not exist "run.py" (
-    echo  ❌ No se encontró run.py en este directorio
-    echo  👉 Asegúrate de ejecutar este script desde la raíz del proyecto
+:: Verificar dependencias instaladas
+if not exist ".venv\Scripts\uvicorn.exe" (
+    echo  ERROR: Dependencias no instaladas en el entorno virtual.
+    echo  Ejecuta setup.cmd para instalarlas.
     echo.
     pause
     exit /b 1
 )
 
-:: Esperar un momento y abrir el navegador en segundo plano
-echo  ✔ Abriendo navegador en http://localhost:8000 ...
-ping 127.0.0.1 -n 3 >nul
-start "" "http://localhost:8000"
+:: Verificar que existe run.py
+if not exist "run.py" (
+    echo  ERROR: No se encontro run.py
+    echo  Asegurate de ejecutar este script desde la raiz del proyecto.
+    echo.
+    pause
+    exit /b 1
+)
 
-:: Lanzar el servidor
-echo  ✔ Iniciando servidor...
+:: Abrir navegador en segundo plano tras breve espera
+echo  [OK] Abriendo navegador en http://localhost:8000 ...
+start "" cmd /c "ping 127.0.0.1 -n 3 >nul && start http://localhost:8000"
+
+:: Lanzar servidor
+echo  [OK] Iniciando servidor...
 echo.
-echo  ─────────────────────────────────────────────
+echo  ------------------------------------------
 echo   URL:      http://localhost:8000
 echo   API docs: http://localhost:8000/docs
 echo   Detener:  Ctrl+C
-echo  ─────────────────────────────────────────────
+echo  ------------------------------------------
 echo.
 
 python run.py
