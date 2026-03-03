@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Prompt Manager</title>
+  <link rel="stylesheet" href="/static/css/styles.css"/>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── SIDEBAR ── -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-icon">⚡</div>
+      <div class="logo-text">Prompt<span>Mgr</span></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navegación</div>
+      <div class="sidebar-item active" data-view="dashboard">
+        <span class="icon">◈</span> Dashboard
+      </div>
+      <div class="sidebar-item" data-view="prompts">
+        <span class="icon">≡</span> Todos los prompts
+        <span class="badge" id="badge-total">0</span>
+      </div>
+      <div class="sidebar-item" data-view="compare">
+        <span class="icon">⇔</span> Comparar
+      </div>
+      <div class="sidebar-item" data-view="criteria">
+        <span class="icon">◎</span> Guía de criterios
+      </div>
+    </div>
+
+    <div class="sidebar-divider"></div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label" style="display:flex;justify-content:space-between;align-items:center;">
+        Proyectos
+        <span style="cursor:pointer;color:var(--accent);font-size:16px;font-weight:600;" onclick="openProjectModal()" title="Nuevo proyecto">+</span>
+      </div>
+      <div id="project-list">
+        <!-- Projects injected here -->
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="sidebar-item" data-view="settings">
+        <span class="icon">⚙</span> Configuración
+        <span class="api-status-dot" id="api-dot"></span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN ── -->
+  <div id="main">
+    <header id="topbar">
+      <div class="topbar-title" id="topbar-title">Dashboard</div>
+      <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="global-search" placeholder="Buscar prompts..." oninput="onGlobalSearch(this.value)"/>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="openNewPromptModal()">+ Nuevo prompt</button>
+    </header>
+
+    <div id="content">
+
+      <!-- ── DASHBOARD VIEW ── -->
+      <div class="view active" id="view-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon">⚡</div>
+            <div class="stat-value" id="stat-prompts">0</div>
+            <div class="stat-label">Prompts totales</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📁</div>
+            <div class="stat-value" id="stat-projects">0</div>
+            <div class="stat-label">Proyectos</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔬</div>
+            <div class="stat-value" id="stat-analyses">—</div>
+            <div class="stat-label">Score medio IA</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🏷</div>
+            <div class="stat-value" id="stat-tags">0</div>
+            <div class="stat-label">Tags únicos</div>
+          </div>
+        </div>
+
+        <div class="section-grid">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Prompts recientes</div>
+              <button class="btn btn-ghost btn-sm" onclick="setView('prompts')">Ver todos →</button>
+            </div>
+            <div class="card-body" id="recent-prompts-list">
+              <div class="loading-overlay"><div class="spinner"></div></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Proyectos</div>
+              <button class="btn btn-ghost btn-sm" onclick="openProjectModal()">+ Nuevo</button>
+            </div>
+            <div class="card-body" id="dashboard-projects">
+              <div class="loading-overlay"><div class="spinner"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── PROMPTS VIEW ── -->
+      <div class="view" id="view-prompts">
+        <div class="page-header">
+          <div class="section-title" id="prompts-view-title">Todos los prompts</div>
+          <div class="flex gap-2">
+            <button class="btn btn-secondary btn-sm" onclick="exportPrompts()">↓ Exportar</button>
+            <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+              ↑ Importar
+              <input type="file" id="import-file" accept=".json" style="display:none" onchange="importPrompts(this)"/>
+            </label>
+            <button class="btn btn-primary btn-sm" onclick="openNewPromptModal()">+ Nuevo prompt</button>
+          </div>
+        </div>
+        <div class="filter-bar" id="tag-filter-bar"></div>
+        <div class="prompt-grid" id="prompts-grid">
+          <div class="loading-overlay"><div class="spinner"></div><span>Cargando prompts...</span></div>
+        </div>
+      </div>
+
+      <!-- ── EDITOR VIEW ── -->
+      <div class="view" id="view-editor">
+        <div class="page-header">
+          <div class="flex items-center gap-3">
+            <button class="btn btn-ghost btn-sm" onclick="goBackFromEditor()">← Volver</button>
+            <input type="text" id="editor-title" class="form-input" style="width:280px;font-family:var(--display);font-weight:600;" placeholder="Título del prompt"/>
+          </div>
+          <div class="flex gap-2">
+            <button class="btn btn-ghost btn-sm" onclick="openVersionHistory()">🕐 Historial</button>
+            <button class="btn btn-secondary btn-sm" onclick="analyzeCurrentPrompt()">🔬 Analizar</button>
+            <button class="btn btn-primary btn-sm" onclick="savePrompt()">💾 Guardar</button>
+          </div>
+        </div>
+
+        <div class="editor-layout">
+          <!-- Editor Panel -->
+          <div class="editor-panel">
+            <div class="editor-toolbar">
+              <select class="form-select" id="editor-project" style="width:160px;">
+                <option value="">Sin proyecto</option>
+              </select>
+              <select class="form-select" id="editor-model" style="width:160px;">
+                <option value="general">general</option>
+              </select>
+              <div style="flex:1"></div>
+              <span class="text-muted text-mono" id="editor-word-count">0 palabras</span>
+            </div>
+            <textarea
+              class="editor-textarea"
+              id="editor-content"
+              placeholder="Escribe tu prompt aquí...
+
+Recuerda los criterios de calidad:
+• Claridad: usa verbos de acción específicos
+• Especificidad: define restricciones y detalles
+• Estructura: separa contexto de instrucción
+• Formato: especifica el output esperado
+• Contexto: define el rol y propósito
+• Ejemplos: añade few-shot si aplica"
+              oninput="onEditorInput()"></textarea>
+            <div style="padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;">
+              <input type="text" class="form-input" id="editor-tags" placeholder="Tags separados por coma..." style="flex:1;"/>
+              <input type="text" class="form-input" id="editor-change-note" placeholder="Nota de cambio..." style="width:200px;"/>
+            </div>
+          </div>
+
+          <!-- Analysis Panel -->
+          <div class="analysis-panel">
+            <div class="card-header">
+              <div class="card-title">Análisis IA</div>
+              <div class="tabs">
+                <div class="tab active" onclick="switchAnalysisTab('analysis', this)">Análisis</div>
+                <div class="tab" onclick="switchAnalysisTab('history', this)">Historial</div>
+              </div>
+            </div>
+            <div id="analysis-content" style="padding:16px;flex:1;">
+              <div class="empty-state">
+                <div class="empty-icon">🔬</div>
+                <p>Haz clic en "Analizar" para<br/>evaluar la calidad del prompt</p>
+                <button class="btn btn-secondary btn-sm" onclick="analyzeCurrentPrompt()">Analizar ahora</button>
+              </div>
+            </div>
+            <div id="analysis-history" style="padding:16px;display:none;">
+              <div class="empty-state"><p>Sin análisis previos</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── COMPARE VIEW ── -->
+      <div class="view" id="view-compare">
+        <div class="page-header">
+          <div class="section-title">Comparar prompts</div>
+        </div>
+        <div class="compare-grid mb-4">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Prompt A</div>
+              <select class="form-select" style="width:200px;" id="compare-a" onchange="loadComparePrompt('a')">
+                <option value="">Selecciona un prompt...</option>
+              </select>
+            </div>
+            <div class="card-body">
+              <div id="compare-content-a" class="text-muted" style="font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre-wrap;min-height:100px;">Selecciona un prompt para ver su contenido</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Prompt B</div>
+              <select class="form-select" style="width:200px;" id="compare-b" onchange="loadComparePrompt('b')">
+                <option value="">Selecciona un prompt...</option>
+              </select>
+            </div>
+            <div class="card-body">
+              <div id="compare-content-b" class="text-muted" style="font-family:var(--mono);font-size:12px;line-height:1.7;white-space:pre-wrap;min-height:100px;">Selecciona un prompt para ver su contenido</div>
+            </div>
+          </div>
+        </div>
+        <div style="text-align:center;margin-bottom:16px;">
+          <button class="btn btn-primary" onclick="runComparison()">🔬 Comparar análisis IA</button>
+        </div>
+        <div id="compare-results" class="compare-grid"></div>
+      </div>
+
+      <!-- ── CRITERIA VIEW ── -->
+      <div class="view" id="view-criteria">
+        <div class="page-header"><div class="section-title">Guía de criterios de calidad</div></div>
+        <div class="criteria-guide" id="criteria-guide-content">
+          <div class="loading-overlay"><div class="spinner"></div></div>
+        </div>
+      </div>
+
+      <!-- ── SETTINGS VIEW ── -->
+      <div class="view" id="view-settings">
+        <div class="page-header"><div class="section-title">Configuración</div></div>
+        <div style="max-width:500px;">
+          <div class="card mb-4">
+            <div class="card-header"><div class="card-title">🤖 Análisis IA con Anthropic</div></div>
+            <div class="card-body">
+              <div class="form-group">
+                <label class="form-label">API Key de Anthropic</label>
+                <input type="password" class="form-input" id="api-key-input" placeholder="sk-ant-api03-..."/>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">
+                  Sin API key se usa análisis heurístico. Con ella, Claude analizará semánticamente tus prompts.
+                </div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;">
+                <button class="btn btn-primary btn-sm" onclick="saveApiKey()">Guardar API key</button>
+                <button class="btn btn-ghost btn-sm" onclick="clearApiKey()">Limpiar</button>
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);">
+                  <div class="api-status-dot" id="api-dot-settings"></div>
+                  <span id="api-key-status-text">No configurada</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header"><div class="card-title">📦 Datos</div></div>
+            <div class="card-body">
+              <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-secondary btn-sm" onclick="exportPrompts()">↓ Exportar todos</button>
+                <label class="btn btn-secondary btn-sm" style="cursor:pointer;">
+                  ↑ Importar prompts
+                  <input type="file" accept=".json" style="display:none" onchange="importPrompts(this)"/>
+                </label>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:10px;">
+                Los archivos exportados son compatibles con otras instalaciones de Prompt Manager.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ── TOAST CONTAINER ── -->
+<div id="toast-container"></div>
+
+<!-- ── MODAL: NEW/EDIT PROMPT ── -->
+<div class="modal-overlay" id="modal-prompt">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-prompt-title">Nuevo prompt</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-prompt')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Título *</label>
+        <input type="text" class="form-input" id="modal-prompt-name" placeholder="Nombre descriptivo del prompt"/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Contenido *</label>
+        <textarea class="form-textarea" id="modal-prompt-content" rows="6" placeholder="Escribe el prompt aquí..."></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group">
+          <label class="form-label">Proyecto</label>
+          <select class="form-select" id="modal-prompt-project">
+            <option value="">Sin proyecto</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Modelo objetivo</label>
+          <select class="form-select" id="modal-prompt-model"></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Tags (separados por coma)</label>
+        <input type="text" class="form-input" id="modal-prompt-tags" placeholder="redacción, resumen, análisis..."/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción</label>
+        <input type="text" class="form-input" id="modal-prompt-desc" placeholder="Para qué sirve este prompt..."/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Nota de versión</label>
+        <input type="text" class="form-input" id="modal-prompt-note" placeholder="Versión inicial" value="Versión inicial"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-prompt')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitPromptModal()">Crear prompt</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: NEW/EDIT PROJECT ── -->
+<div class="modal-overlay" id="modal-project">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-project-title">Nuevo proyecto</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-project')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nombre *</label>
+        <input type="text" class="form-input" id="modal-project-name" placeholder="Mi proyecto..."/>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Descripción</label>
+        <textarea class="form-textarea" id="modal-project-desc" rows="2" placeholder="Para qué sirve este proyecto..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Icono</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;" id="icon-picker">
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="📁">📁</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="🚀">🚀</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="💡">💡</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="🎯">🎯</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="⚡">⚡</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="🔬">🔬</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="📝">📝</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="🤖">🤖</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="🎨">🎨</span>
+          <span style="cursor:pointer;font-size:20px;padding:4px;" onclick="selectIcon(this)" title="📊">📊</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Color</label>
+        <div class="color-row" id="color-picker">
+          <div class="color-swatch selected" style="background:#3b82f6;" data-color="#3b82f6" onclick="selectColor(this)"></div>
+          <div class="color-swatch" style="background:#8b5cf6;" data-color="#8b5cf6" onclick="selectColor(this)"></div>
+          <div class="color-swatch" style="background:#ec4899;" data-color="#ec4899" onclick="selectColor(this)"></div>
+          <div class="color-swatch" style="background:#10b981;" data-color="#10b981" onclick="selectColor(this)"></div>
+          <div class="color-swatch" style="background:#f59e0b;" data-color="#f59e0b" onclick="selectColor(this)"></div>
+          <div class="color-swatch" style="background:#ef4444;" data-color="#ef4444" onclick="selectColor(this)"></div>
+          <div class="color-swatch" style="background:#06b6d4;" data-color="#06b6d4" onclick="selectColor(this)"></div>
+          <div class="color-swatch" style="background:#64748b;" data-color="#64748b" onclick="selectColor(this)"></div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-danger btn-sm" id="modal-project-delete" style="margin-right:auto;display:none" onclick="deleteCurrentProject()">Eliminar</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-project')">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitProjectModal()">Guardar proyecto</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL: VERSION HISTORY ── -->
+<div class="modal-overlay" id="modal-versions">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">🕐 Historial de versiones</div>
+      <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-versions')">✕</button>
+    </div>
+    <div class="modal-body" id="modal-versions-content">
+      <div class="loading-overlay"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
