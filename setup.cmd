@@ -9,25 +9,61 @@ echo.
 
 :: ── 1. Verificar Python ──────────────────────────────────
 echo  [1/5] Verificando Python...
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo  ERROR: Python no encontrado en PATH.
-    echo  Instala Python 3.11 o 3.12 desde https://python.org
-    echo  y marca "Add Python to PATH" durante la instalacion.
-    echo.
-    pause
-    exit /b 1
-)
-for /f "tokens=*" %%i in ('python --version 2^>^&1') do set PYVER=%%i
-echo  [OK] %PYVER% detectado
 
-:: Advertir si es Python 3.13 o superior
-for /f "tokens=2 delims=." %%v in ('python -c "import sys; print(sys.version_info.minor)"') do set PYMINOR=%%v
+:: Comprobar si Python 3.12 ya esta instalado en el sistema
+python --version >nul 2>&1
+if not errorlevel 1 (
+    for /f "tokens=*" %%i in ('python --version 2^>^&1') do echo  [OK] %%i encontrado en PATH
+    goto :check_version
+)
+
+:: No esta en PATH, buscar instalador .exe en la carpeta del proyecto
+echo  Python no encontrado en PATH. Buscando instalador local...
+
+set INSTALLER=
+for %%f in ("%~dp0python-*.exe") do set INSTALLER=%%f
+
+if not "%INSTALLER%"=="" (
+    echo  [OK] Instalador encontrado: %INSTALLER%
+    echo  Instalando Python 3.12 en modo silencioso...
+    "%INSTALLER%" /quiet InstallAllUsers=0 PrependPath=1 Include_test=0
+    if errorlevel 1 (
+        echo  ERROR: Fallo la instalacion de Python.
+        echo  Intenta ejecutar el instalador manualmente: %INSTALLER%
+        pause
+        exit /b 1
+    )
+    echo  [OK] Python instalado correctamente
+    :: Recargar PATH para que python sea accesible
+    call refreshenv >nul 2>&1
+    goto :check_version
+)
+
+:: No hay instalador local -> abrir web oficial y salir
+echo.
+echo  ERROR: No se encontro Python ni un instalador en la carpeta del proyecto.
+echo.
+echo  Abriendo la pagina oficial de descarga de Python 3.12...
+start "" "https://www.python.org/downloads/release/python-31210/"
+echo.
+echo  Instrucciones:
+echo    1. Descarga el archivo "Windows installer (64-bit)"
+echo    2. Coloca el .exe en la misma carpeta que este setup.cmd
+echo    3. Vuelve a ejecutar setup.cmd  (lo instalara automaticamente)
+echo.
+pause
+exit /b 1
+
+:check_version
+:: Advertir si la version es 3.13 o superior
 python -c "import sys; exit(0 if sys.version_info < (3,13) else 1)" >nul 2>&1
 if errorlevel 1 (
     echo.
-    echo  AVISO: Tienes Python 3.13 o superior.
-    echo  Se recomienda Python 3.11 o 3.12 para evitar errores de compilacion.
+    echo  AVISO: La version de Python detectada es 3.13 o superior.
+    echo  Se recomienda Python 3.12 para evitar errores de compilacion.
+    echo  Puedes descargar Python 3.12 desde:
+    echo    https://www.python.org/downloads/release/python-31210/
+    echo.
     echo  Continuar de todas formas? Pulsa cualquier tecla o cierra esta ventana.
     echo.
     pause
