@@ -247,28 +247,90 @@ Recuerda los criterios de calidad:
       <!-- ── SETTINGS VIEW ── -->
       <div class="view" id="view-settings">
         <div class="page-header"><div class="section-title">Configuración</div></div>
-        <div style="max-width:500px;">
+        <div style="max-width:560px;">
+
+          <!-- Provider cards -->
           <div class="card mb-4">
-            <div class="card-header"><div class="card-title">🤖 Análisis IA con Anthropic</div></div>
-            <div class="card-body">
-              <div class="form-group">
-                <label class="form-label">API Key de Anthropic</label>
-                <input type="password" class="form-input" id="api-key-input" placeholder="sk-ant-api03-..."/>
-                <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">
-                  Sin API key se usa análisis heurístico. Con ella, Claude analizará semánticamente tus prompts.
+            <div class="card-header"><div class="card-title">🤖 Proveedores de análisis IA</div></div>
+            <div class="card-body" style="display:flex;flex-direction:column;gap:16px;">
+
+              <!-- Anthropic -->
+              <div style="background:var(--bg-overlay);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                  <div class="api-status-dot" id="dot-anthropic"></div>
+                  <span style="font-weight:600;font-size:13px;">Anthropic</span>
+                  <span style="font-size:11px;color:var(--text-muted);margin-left:auto;" id="preview-anthropic"></span>
                 </div>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                  <input type="password" class="form-input" id="key-anthropic" placeholder="sk-ant-api03-..." style="flex:1;"/>
+                  <select class="form-select" id="model-anthropic" style="width:220px;"></select>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn-primary btn-sm" onclick="saveProviderKey('anthropic')">Guardar</button>
+                  <button class="btn btn-ghost btn-sm" onclick="clearProviderKey('anthropic')">Limpiar</button>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Clave desde <a href="https://console.anthropic.com" target="_blank" style="color:var(--accent);">console.anthropic.com</a> · Formato: sk-ant-api03-...</div>
               </div>
-              <div style="display:flex;gap:10px;align-items:center;">
-                <button class="btn btn-primary btn-sm" onclick="saveApiKey()">Guardar API key</button>
-                <button class="btn btn-ghost btn-sm" onclick="clearApiKey()">Limpiar</button>
-                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted);">
-                  <div class="api-status-dot" id="api-dot-settings"></div>
-                  <span id="api-key-status-text">No configurada</span>
+
+              <!-- OpenAI -->
+              <div style="background:var(--bg-overlay);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                  <div class="api-status-dot" id="dot-openai"></div>
+                  <span style="font-weight:600;font-size:13px;">OpenAI</span>
+                  <span style="font-size:11px;color:var(--text-muted);margin-left:auto;" id="preview-openai"></span>
                 </div>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                  <input type="password" class="form-input" id="key-openai" placeholder="sk-..." style="flex:1;"/>
+                  <select class="form-select" id="model-openai" style="width:220px;"></select>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn-primary btn-sm" onclick="saveProviderKey('openai')">Guardar</button>
+                  <button class="btn btn-ghost btn-sm" onclick="clearProviderKey('openai')">Limpiar</button>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Clave desde <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent);">platform.openai.com</a> · Formato: sk-...</div>
+              </div>
+
+              <!-- DeepSeek -->
+              <div style="background:var(--bg-overlay);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                  <div class="api-status-dot" id="dot-deepseek"></div>
+                  <span style="font-weight:600;font-size:13px;">DeepSeek</span>
+                  <span style="font-size:11px;color:var(--text-muted);margin-left:auto;" id="preview-deepseek"></span>
+                </div>
+                <div style="display:flex;gap:8px;margin-bottom:8px;">
+                  <input type="password" class="form-input" id="key-deepseek" placeholder="sk-..." style="flex:1;"/>
+                  <select class="form-select" id="model-deepseek" style="width:220px;"></select>
+                </div>
+                <div style="display:flex;gap:8px;">
+                  <button class="btn btn-primary btn-sm" onclick="saveProviderKey('deepseek')">Guardar</button>
+                  <button class="btn btn-ghost btn-sm" onclick="clearProviderKey('deepseek')">Limpiar</button>
+                </div>
+                <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">Clave desde <a href="https://platform.deepseek.com/api_keys" target="_blank" style="color:var(--accent);">platform.deepseek.com</a> · Formato: sk-...</div>
+              </div>
+
+              <div style="font-size:11px;color:var(--text-muted);padding:8px;background:var(--bg-base);border-radius:var(--radius-sm);">
+                ℹ Si hay varios proveedores configurados, el análisis usa el proveedor activo seleccionado en el editor. Sin ninguna API key activa se usa análisis heurístico.
               </div>
             </div>
           </div>
 
+          <!-- Active provider selector -->
+          <div class="card mb-4">
+            <div class="card-header"><div class="card-title">⚡ Proveedor activo para análisis</div></div>
+            <div class="card-body">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;" id="active-provider-selector">
+                <button class="btn btn-secondary btn-sm active-prov-btn" data-provider="auto" onclick="setActiveProvider('auto')">Auto</button>
+                <button class="btn btn-secondary btn-sm active-prov-btn" data-provider="anthropic" onclick="setActiveProvider('anthropic')">Anthropic</button>
+                <button class="btn btn-secondary btn-sm active-prov-btn" data-provider="openai" onclick="setActiveProvider('openai')">OpenAI</button>
+                <button class="btn btn-secondary btn-sm active-prov-btn" data-provider="deepseek" onclick="setActiveProvider('deepseek')">DeepSeek</button>
+              </div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:8px;">
+                "Auto" usa el primer proveedor con API key configurada.
+              </div>
+            </div>
+          </div>
+
+          <!-- Data -->
           <div class="card">
             <div class="card-header"><div class="card-title">📦 Datos</div></div>
             <div class="card-body">
@@ -284,6 +346,7 @@ Recuerda los criterios de calidad:
               </div>
             </div>
           </div>
+
         </div>
       </div>
 

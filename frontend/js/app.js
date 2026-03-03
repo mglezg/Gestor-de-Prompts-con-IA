@@ -357,17 +357,25 @@ function updateWordCount() {
 
 // ── ANALYSIS ──────────────────────────────────────────────
 async function analyzeCurrentPrompt() {
-  const content = state.currentPromptId
-    ? document.getElementById('editor-content').value
-    : null;
+  const content = document.getElementById('editor-content').value;
   if (!content || !content.trim()) { toast('El prompt está vacío', 'error'); return; }
 
   const analysisEl = document.getElementById('analysis-content');
-  analysisEl.innerHTML = `<div class="loading-overlay"><div class="spinner"></div><span>Analizando con IA...</span></div>`;
+  analysisEl.innerHTML = `<div class="loading-overlay"><div class="spinner"></div><span>Analizando...</span></div>`;
 
-  const payload = state.currentPromptId
-    ? { prompt_id: state.currentPromptId }
-    : { content };
+  // Resolver proveedor y modelo activos
+  const providerToUse = activeProvider === 'auto' ? null : activeProvider;
+  let modelToUse = null;
+  if (providerToUse) {
+    const sel = document.getElementById(`model-${providerToUse}`);
+    modelToUse = sel ? sel.value : null;
+  }
+
+  const payload = {
+    ...(state.currentPromptId ? { prompt_id: state.currentPromptId } : { content }),
+    ...(providerToUse ? { provider: providerToUse } : {}),
+    ...(modelToUse    ? { model: modelToUse }       : {}),
+  };
 
   const result = await api('/analysis/analyze', { method: 'POST', body: JSON.stringify(payload) }).catch(() => null);
   if (!result) { analysisEl.innerHTML = '<div class="empty-state"><p>Error al analizar</p></div>'; return; }
@@ -667,33 +675,85 @@ async function deleteCurrentProject() {
 }
 
 // ── SETTINGS ──────────────────────────────────────────────
+let providersStatus = {};
+let activeProvider = localStorage.getItem('activeProvider') || 'auto';
+
 async function loadSettings() {
-  checkApiKeyStatus();
+  await refreshProvidersStatus();
+  renderProviderModels();
+  highlightActiveProvider();
 }
 
+async function refreshProvidersStatus() {
+  providersStatus = await api('/analysis/config/providers').catch(() => ({}));
+
+  ['anthropic', 'openai', 'deepseek'].forEach(prov => {
+    const dot = document.getElementById(`dot-${prov}`);
+    const preview = document.getElementById(`preview-${prov}`);
+    const info = providersStatus[prov] || {};
+    if (dot) dot.classList.toggle('active', info.configured);
+    if (preview) preview.textContent = info.configured ? info.preview : 'No configurada';
+  });
+
+  // Sidebar dot: verde si al menos uno activo
+  const anyActive = Object.values(providersStatus).some(p => p.configured);
+  const sidebarDot = document.getElementById('api-dot');
+  if (sidebarDot) sidebarDot.classList.toggle('active', anyActive);
+}
+
+function renderProviderModels() {
+  ['anthropic', 'openai', 'deepseek'].forEach(prov => {
+    const sel = document.getElementById(`model-${prov}`);
+    if (!sel) return;
+    const info = providersStatus[prov] || {};
+    const models = info.models || [];
+    const def = info.default_model || '';
+    sel.innerHTML = models.map(m =>
+      `<option value="${m}" ${m === def ? 'selected' : ''}>${m}</option>`
+    ).join('');
+  });
+}
+
+function highlightActiveProvider() {
+  document.querySelectorAll('.active-prov-btn').forEach(btn => {
+    btn.classList.toggle('btn-primary', btn.dataset.provider === activeProvider);
+    btn.classList.toggle('btn-secondary', btn.dataset.provider !== activeProvider);
+  });
+}
+
+function setActiveProvider(prov) {
+  activeProvider = prov;
+  localStorage.setItem('activeProvider', prov);
+  highlightActiveProvider();
+  toast(`Proveedor activo: ${prov}`, 'info');
+}
+
+async function saveProviderKey(provider) {
+  const key = document.getElementById(`key-${provider}`)?.value.trim();
+  if (!key) { toast('Introduce una API key', 'error'); return; }
+
+  await api('/analysis/config/api-key', {
+    method: 'POST',
+    body: JSON.stringify({ provider, api_key: key })
+  });
+
+  document.getElementById(`key-${provider}`).value = '';
+  toast(`API key de ${provider} guardada`, 'success');
+  await refreshProvidersStatus();
+}
+
+async function clearProviderKey(provider) {
+  await api('/analysis/config/api-key', {
+    method: 'POST',
+    body: JSON.stringify({ provider, api_key: '' })
+  });
+  toast(`API key de ${provider} eliminada`, 'info');
+  await refreshProvidersStatus();
+}
+
+// Kept for backward compat (sidebar dot on init)
 async function checkApiKeyStatus() {
-  const status = await api('/analysis/config/api-key-status').catch(() => ({ configured: false }));
-  const dot = document.getElementById('api-dot');
-  const dotSettings = document.getElementById('api-dot-settings');
-  const text = document.getElementById('api-key-status-text');
-
-  if (dot) dot.classList.toggle('active', status.configured);
-  if (dotSettings) dotSettings.classList.toggle('active', status.configured);
-  if (text) text.textContent = status.configured ? `Configurada (${status.preview})` : 'No configurada';
-}
-
-async function saveApiKey() {
-  const key = document.getElementById('api-key-input').value.trim();
-  await api('/analysis/config/api-key', { method: 'POST', body: JSON.stringify({ api_key: key }) });
-  toast('API key guardada', 'success');
-  document.getElementById('api-key-input').value = '';
-  checkApiKeyStatus();
-}
-
-async function clearApiKey() {
-  await api('/analysis/config/api-key', { method: 'POST', body: JSON.stringify({ api_key: '' }) });
-  toast('API key eliminada', 'info');
-  checkApiKeyStatus();
+  await refreshProvidersStatus();
 }
 
 // ── EXPORT / IMPORT ───────────────────────────────────────

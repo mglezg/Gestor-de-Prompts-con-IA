@@ -31,7 +31,7 @@ app.include_router(prompts.router, prefix="/api")
 app.include_router(ai_analysis.router, prefix="/api")
 
 # Serve frontend static files
-FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "frontend")
+FRONTEND_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "frontend")
 app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 @app.get("/")
