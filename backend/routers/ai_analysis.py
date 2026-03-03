@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 import os
 from datetime import datetime
+from pathlib import Path
 from backend.database import get_db
 from backend.models.prompt import Prompt
 from backend.models.analysis import Analysis
@@ -13,15 +14,40 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
-# ── Almacen de API keys en memoria del proceso ────────────
-# Se usa un dict en el modulo para que persista entre requests
-# dentro del mismo proceso worker (no se pierde como os.environ
-# entre procesos padre/hijo de uvicorn --reload)
-_api_keys: dict = {
-    "anthropic": os.environ.get("ANTHROPIC_API_KEY", ""),
-    "openai":    os.environ.get("OPENAI_API_KEY", ""),
-    "deepseek":  os.environ.get("DEEPSEEK_API_KEY", ""),
+# ── Archivo .env local donde se persisten las keys ────────
+ENV_FILE = Path(__file__).parent.parent.parent / "data" / ".env.keys"
+ENV_VARS = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai":    "OPENAI_API_KEY",
+    "deepseek":  "DEEPSEEK_API_KEY",
 }
+
+def _load_keys_from_file() -> dict:
+    """Lee las keys del archivo .env.keys si existe."""
+    keys = {"anthropic": "", "openai": "", "deepseek": ""}
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if "=" in line and not line.startswith("#"):
+                k, _, v = line.partition("=")
+                k = k.strip()
+                v = v.strip()
+                for prov, env_var in ENV_VARS.items():
+                    if k == env_var:
+                        keys[prov] = v
+    return keys
+
+def _save_keys_to_file(keys: dict):
+    """Escribe las keys en el archivo .env.keys (solo en data/, nunca sale del equipo)."""
+    ENV_FILE.parent.mkdir(parents=True, exist_ok=True)
+    lines = ["# Prompt Manager - API Keys (no compartir este archivo)\n"]
+    for prov, env_var in ENV_VARS.items():
+        val = keys.get(prov, "")
+        lines.append(f"{env_var}={val}\n")
+    ENV_FILE.write_text("".join(lines), encoding="utf-8")
+
+# Cargar keys al arrancar el servidor
+_api_keys: dict = _load_keys_from_file()
 
 
 class AnalyzeRequest(BaseModel):
@@ -31,12 +57,10 @@ class AnalyzeRequest(BaseModel):
     provider:  Optional[str] = None
     model:     Optional[str] = None
 
-
 class QuickAnalyzeRequest(BaseModel):
     content:  str
     provider: Optional[str] = None
     model:    Optional[str] = None
-
 
 class ApiKeyConfig(BaseModel):
     provider: str
@@ -44,24 +68,16 @@ class ApiKeyConfig(BaseModel):
 
 
 def _resolve_provider_and_key(requested_provider: Optional[str]):
-    """
-    Devuelve (provider, key) segun el proveedor solicitado.
-    Si es None o 'auto', usa el primer proveedor con key configurada.
-    """
     if requested_provider and requested_provider != "auto":
         key = _api_keys.get(requested_provider, "")
         return (requested_provider, key)
-
-    # Modo auto: primer proveedor con key
     for prov in ("anthropic", "openai", "deepseek"):
         key = _api_keys.get(prov, "")
         if key:
             return (prov, key)
-
     return (None, "")
 
 
-# ── Endpoints ────────────────────────────────────────────
 @router.post("/analyze", response_model=AnalysisOut)
 async def analyze(req: AnalyzeRequest, db: Session = Depends(get_db)):
     provider, api_key = _resolve_provider_and_key(req.provider)
@@ -125,7 +141,6 @@ def get_prompt_analyses(prompt_id: int, db: Session = Depends(get_db)):
 def get_criteria():
     return CRITERIA
 
-
 @router.get("/model-targets")
 def get_model_targets():
     return MODEL_TARGETS
@@ -133,21 +148,23 @@ def get_model_targets():
 
 @router.post("/config/api-key")
 async def set_api_key(data: ApiKeyConfig):
-    """Guarda la API key en el diccionario en memoria del proceso."""
+    """Guarda la API key en memoria y en data/.env.keys (local, no sale del equipo)."""
     provider = data.provider.lower()
     if provider not in _api_keys:
         raise HTTPException(status_code=400, detail=f"Proveedor desconocido: {provider}")
 
     _api_keys[provider] = data.api_key.strip()
+    _save_keys_to_file(_api_keys)
+
     if data.api_key.strip():
-        return {"ok": True, "message": f"API key de {provider} configurada"}
+        return {"ok": True, "message": f"API key de {provider} guardada y persistida"}
     else:
         return {"ok": True, "message": f"API key de {provider} eliminada"}
 
 
 @router.get("/config/providers")
 async def get_providers_status():
-    """Estado de los tres proveedores y sus modelos disponibles."""
+    """Estado de los tres proveedores con modelos disponibles."""
     result = {}
     for prov in ("anthropic", "openai", "deepseek"):
         key = _api_keys.get(prov, "")
@@ -158,3 +175,14 @@ async def get_providers_status():
             "default_model": DEFAULT_MODELS.get(prov, ""),
         }
     return result
+
+
+# Endpoint de compatibilidad con versiones anteriores del frontend
+@router.get("/config/api-key-status")
+async def api_key_status_compat():
+    any_configured = any(bool(v) for v in _api_keys.values())
+    first_key = next((v for v in _api_keys.values() if v), "")
+    return {
+        "configured": any_configured,
+        "preview": f"{first_key[:10]}..." if len(first_key) > 10 else ""
+    }

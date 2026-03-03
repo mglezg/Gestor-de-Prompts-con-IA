@@ -86,7 +86,7 @@ async function init() {
   await loadProjects();
   loadDashboard();
   setupSidebarNav();
-  checkApiKeyStatus();
+  refreshProvidersStatus();
 }
 
 async function loadMeta() {
@@ -416,15 +416,17 @@ function renderAnalysisResult(result, container) {
   container.innerHTML = `
     <div style="text-align:center;margin-bottom:18px;">
       <div style="display:inline-flex;flex-direction:column;align-items:center;gap:6px;">
-        <svg width="90" height="90" viewBox="0 0 90 90" style="transform:rotate(-90deg)">
-          <circle cx="45" cy="45" r="38" fill="none" stroke="var(--bg-elevated)" stroke-width="7"/>
-          <circle cx="45" cy="45" r="38" fill="none" stroke="${color}" stroke-width="7"
-            stroke-dasharray="${2*Math.PI*38}" stroke-dashoffset="${2*Math.PI*38*(1-score/100)}"
-            stroke-linecap="round"/>
-        </svg>
-        <div style="position:absolute;display:inline-flex;flex-direction:column;align-items:center;transform:translateY(-62px);">
-          <div style="font-family:var(--display);font-size:22px;font-weight:700;color:${color};">${score.toFixed(0)}</div>
-          <div style="font-size:10px;color:var(--text-muted);">/ 100</div>
+        <div style="position:relative;width:90px;height:90px;">
+          <svg width="90" height="90" viewBox="0 0 90 90" style="transform:rotate(-90deg);display:block;">
+            <circle cx="45" cy="45" r="38" fill="none" stroke="var(--bg-elevated)" stroke-width="7"/>
+            <circle cx="45" cy="45" r="38" fill="none" stroke="${color}" stroke-width="7"
+              stroke-dasharray="${2*Math.PI*38}" stroke-dashoffset="${2*Math.PI*38*(1-score/100)}"
+              stroke-linecap="round"/>
+          </svg>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;line-height:1;">
+            <div style="font-family:var(--display);font-size:22px;font-weight:700;color:${color};">${score.toFixed(0)}</div>
+            <div style="font-size:10px;color:var(--text-muted);">/ 100</div>
+          </div>
         </div>
       </div>
       <div style="font-size:12px;color:var(--text-muted);margin-top:4px;">${result.model_used === 'heuristic' ? 'Análisis heurístico' : '✨ Análisis con IA'}</div>
@@ -688,11 +690,27 @@ async function refreshProvidersStatus() {
   providersStatus = await api('/analysis/config/providers').catch(() => ({}));
 
   ['anthropic', 'openai', 'deepseek'].forEach(prov => {
-    const dot = document.getElementById(`dot-${prov}`);
+    const dot     = document.getElementById(`dot-${prov}`);
     const preview = document.getElementById(`preview-${prov}`);
-    const info = providersStatus[prov] || {};
+    const info    = providersStatus[prov] || {};
+
     if (dot) dot.classList.toggle('active', info.configured);
-    if (preview) preview.textContent = info.configured ? info.preview : 'No configurada';
+
+    if (preview) {
+      if (info.configured) {
+        preview.textContent = `Configurada (${info.preview})`;
+        preview.style.color = 'var(--success)';
+      } else {
+        preview.textContent = 'No configurada';
+        preview.style.color = 'var(--text-muted)';
+      }
+    }
+
+    // Colorear el borde de la tarjeta segun estado
+    const card = dot ? dot.closest('div[style*="background:var(--bg-overlay)"]') : null;
+    if (card) {
+      card.style.borderColor = info.configured ? 'rgba(16,185,129,0.4)' : 'var(--border)';
+    }
   });
 
   // Sidebar dot: verde si al menos uno activo
@@ -732,13 +750,15 @@ async function saveProviderKey(provider) {
   const key = document.getElementById(`key-${provider}`)?.value.trim();
   if (!key) { toast('Introduce una API key', 'error'); return; }
 
-  await api('/analysis/config/api-key', {
+  const result = await api('/analysis/config/api-key', {
     method: 'POST',
     body: JSON.stringify({ provider, api_key: key })
-  });
+  }).catch(() => null);
+
+  if (!result) return;
 
   document.getElementById(`key-${provider}`).value = '';
-  toast(`API key de ${provider} guardada`, 'success');
+  toast(`✓ API key de ${provider} guardada — persistida en data/.env.keys`, 'success');
   await refreshProvidersStatus();
 }
 
@@ -751,7 +771,6 @@ async function clearProviderKey(provider) {
   await refreshProvidersStatus();
 }
 
-// Kept for backward compat (sidebar dot on init)
 async function checkApiKeyStatus() {
   await refreshProvidersStatus();
 }

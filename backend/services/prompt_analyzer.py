@@ -227,22 +227,31 @@ async def _openai_analysis(content: str, api_key: str, model: str) -> dict:
 
 
 async def _deepseek_analysis(content: str, api_key: str, model: str) -> dict:
-    """Analisis semantico usando DeepSeek (API compatible con OpenAI SDK)."""
+    """Analisis semantico usando DeepSeek via httpx (sin depender del SDK openai)."""
     try:
-        from openai import OpenAI
-        client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.deepseek.com"
-        )
-        response = client.chat.completions.create(
-            model=model,
-            max_tokens=1500,
-            messages=[
+        import httpx
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        payload = {
+            "model": model,
+            "max_tokens": 1500,
+            "messages": [
                 {"role": "system", "content": ANALYSIS_SYSTEM_PROMPT},
                 {"role": "user",   "content": f"Analiza este prompt:\n\n{content}"}
             ]
-        )
-        response_text = _clean_json_response(response.choices[0].message.content)
+        }
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                "https://api.deepseek.com/chat/completions",
+                headers=headers,
+                json=payload
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        response_text = _clean_json_response(data["choices"][0]["message"]["content"])
         result = json.loads(response_text)
         result["model_used"] = f"deepseek/{model}"
         return result
