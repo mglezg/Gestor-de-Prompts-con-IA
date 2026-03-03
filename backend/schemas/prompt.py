@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional, List, Any
 
 class PromptBase(BaseModel):
+    model_config = {"protected_namespaces": ()}
     title: str
     content: str
     description: Optional[str] = ""
@@ -14,6 +15,7 @@ class PromptCreate(PromptBase):
     change_note: Optional[str] = "Versión inicial"
 
 class PromptUpdate(BaseModel):
+    model_config = {"protected_namespaces": ()}
     title: Optional[str] = None
     content: Optional[str] = None
     description: Optional[str] = None
@@ -58,6 +60,7 @@ class SuggestionItem(BaseModel):
     priority: str  # high, medium, low
 
 class AnalysisOut(BaseModel):
+    model_config = {"protected_namespaces": (), "from_attributes": True}
     id: int
     prompt_id: int
     prompt_version: int
@@ -68,9 +71,6 @@ class AnalysisOut(BaseModel):
     summary: str
     model_used: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 # Export/Import schemas
 class PromptExport(BaseModel):
