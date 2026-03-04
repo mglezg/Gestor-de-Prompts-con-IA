@@ -1,0 +1,52 @@
+NOTICE
+======
+
+Prompt Manager
+Copyright 2026 Miguel Gonzalez Gonzalez
+
+Este producto se distribuye bajo los términos de la Licencia Apache, Version 2.0
+(la "Licencia"). No puedes usar este archivo excepto en cumplimiento con la Licencia.
+Puedes obtener una copia de la Licencia en:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+A menos que sea requerido por la ley aplicable o acordado por escrito, el software
+distribuido bajo la Licencia se distribuye "TAL CUAL", SIN GARANTÍAS NI CONDICIONES
+DE NINGÚN TIPO, ya sean expresas o implícitas. Consulta la Licencia para conocer el
+lenguaje específico que rige los permisos y limitaciones bajo la Licencia.
+
+------------------------------------------------------------------------
+
+AUTORÍA ORIGINAL
+
+El diseño, arquitectura, código fuente y documentación de Prompt Manager
+han sido creados íntegramente por su autor. Ninguna parte de este software
+proviene de obras de terceros salvo las dependencias declaradas explícitamente
+en el archivo requirements.txt, las cuales mantienen sus propias licencias.
+
+Dependencias principales y sus licencias:
+  - FastAPI         — MIT License         https://github.com/fastapi/fastapi
+  - SQLAlchemy      — MIT License         https://github.com/sqlalchemy/sqlalchemy
+  - Pydantic        — MIT License         https://github.com/pydantic/pydantic
+  - Uvicorn         — BSD License         https://github.com/encode/uvicorn
+  - Anthropic SDK   — MIT License         https://github.com/anthropics/anthropic-sdk-python
+  - OpenAI SDK      — Apache 2.0          https://github.com/openai/openai-python
+  - httpx           — BSD License         https://github.com/encode/httpx
+  - aiofiles        — Apache 2.0          https://github.com/Tinche/aiofiles
+
+------------------------------------------------------------------------
+
+CONDICIONES DE REDISTRIBUCIÓN
+
+Cualquier redistribución de este software, modificada o no, debe:
+
+  1. Conservar el aviso de copyright original en todos los archivos fuente.
+  2. Incluir una copia de este archivo NOTICE en la distribución.
+  3. Incluir una copia del archivo LICENSE con los términos completos de la
+     Licencia Apache 2.0.
+  4. No utilizar el nombre del autor original para endorsar o promocionar
+     productos derivados sin permiso previo y por escrito.
+
+El incumplimiento de estas condiciones constituye una infracción de los
+derechos de propiedad intelectual protegidos por la Licencia Apache 2.0
+y por la legislación de propiedad intelectual aplicable.
